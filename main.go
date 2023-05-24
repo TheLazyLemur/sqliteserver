@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/go-chi/chi"
@@ -158,7 +159,7 @@ func main() {
 	defer db.Close()
 
 	s := &Server{
-		port:      ":5050",
+		port:      ":" + os.Getenv("PORT"),
 		db:        db,
 		isLeader:  true,
 		followers: make(map[string]struct{}),
