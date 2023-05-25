@@ -112,6 +112,4 @@ func (s *Server) QueryHandler(w http.ResponseWriter, r *http.Request) {
 
 	queryResult.Result = results
 	_ = json.NewEncoder(w).Encode(queryResult)
-
-	_ = json.NewEncoder(w).Encode(queryResult)
 }
