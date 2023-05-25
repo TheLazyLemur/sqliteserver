@@ -1,13 +1,11 @@
 package server
 
 import (
-	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi"
 	"github.com/thelazylemur/sqliteserver/server/middleware"
@@ -27,23 +25,9 @@ func (s *Server) Run() {
 	router.Use(middleware.DbPassword)
 	router.Post("/query", s.QueryHandler)
 	router.Post("/health", s.HealthHandler)
-	router.Post("/follower", s.FollowerHandler)
 
 	log.Printf("Listening on port %s", s.Port)
 	log.Fatal(http.ListenAndServe(s.Port, router))
-}
-
-func (s *Server) FollowerHandler(w http.ResponseWriter, r *http.Request) {
-	addFollowerReq := new(types.AddFollowerRequest)
-	err := json.NewDecoder(r.Body).Decode(addFollowerReq)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	fmt.Println(addFollowerReq.Address + addFollowerReq.Port)
-
-	s.Followers[addFollowerReq.Address+addFollowerReq.Port] = struct{}{}
 }
 
 func (s *Server) HealthHandler(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +43,7 @@ func (s *Server) QueryHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		queryResult.Error = err.Error()
 		queryResult.Result = nil
-		json.NewEncoder(w).Encode(queryResult)
+		_ = json.NewEncoder(w).Encode(queryResult)
 		fmt.Println(err)
 		return
 	}
@@ -69,7 +53,7 @@ func (s *Server) QueryHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		queryResult.Error = err.Error()
 		queryResult.Result = nil
-		json.NewEncoder(w).Encode(queryResult)
+		_ = json.NewEncoder(w).Encode(queryResult)
 		return
 	}
 
@@ -81,7 +65,7 @@ func (s *Server) QueryHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		queryResult.Error = err.Error()
 		queryResult.Result = nil
-		json.NewEncoder(w).Encode(queryResult)
+		_ = json.NewEncoder(w).Encode(queryResult)
 		return
 	}
 	for rows.Next() {
@@ -96,7 +80,7 @@ func (s *Server) QueryHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			queryResult.Error = err.Error()
 			queryResult.Result = nil
-			json.NewEncoder(w).Encode(queryResult)
+			_ = json.NewEncoder(w).Encode(queryResult)
 			return
 		}
 
@@ -112,40 +96,12 @@ func (s *Server) QueryHandler(w http.ResponseWriter, r *http.Request) {
 	if err = rows.Err(); err != nil {
 		queryResult.Error = err.Error()
 		queryResult.Result = nil
-		json.NewEncoder(w).Encode(queryResult)
+		_ = json.NewEncoder(w).Encode(queryResult)
 		return
 	}
 
-	if strings.Contains(query.SqlQuery, "INSERT") || strings.Contains(query.SqlQuery, "UPDATE") || strings.Contains(query.SqlQuery, "DELETE") || strings.Contains(query.SqlQuery, "CREATE") {
-		fmt.Println("Sending to followers")
-		//TODO: handle replication
-		s.SendToFollowers(query)
-	}
-
 	queryResult.Result = results
-	json.NewEncoder(w).Encode(queryResult)
+	_ = json.NewEncoder(w).Encode(queryResult)
 
 	_ = json.NewEncoder(w).Encode(queryResult)
-}
-
-func (s *Server) SendToFollowers(query types.Query) {
-	//TODO: handle replication
-	jsonToSend, err := json.Marshal(query)
-	if err != nil {
-		log.Print(err)
-	}
-
-	for ip := range s.Followers {
-		client := &http.Client{}
-		req, err := http.NewRequest("POST", ip+"/query", bytes.NewBuffer(jsonToSend))
-		if err != nil {
-			log.Fatal(err)
-		}
-		req.Header.Set("secret", "secret")
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer resp.Body.Close()
-	}
 }
