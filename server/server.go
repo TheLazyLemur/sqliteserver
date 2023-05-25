@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi"
 	"github.com/thelazylemur/sqliteserver/server/middleware"
@@ -13,11 +14,9 @@ import (
 )
 
 type Server struct {
-	Db          *sql.DB
-	Port        string
-	IsLeader    bool
-	Followers   map[string]struct{}
-	LeaderAddrr string
+	Db   *sql.DB
+	Port string
+	Logs []string
 }
 
 func (s *Server) Run() {
@@ -35,6 +34,11 @@ func (s *Server) HealthHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("OK"))
 }
 
+func ShouldAddQueryToLogs(query types.Query) bool {
+	lowerdQuery := strings.ToLower(query.SqlQuery)
+	return strings.Contains(lowerdQuery, "insert") || strings.Contains(lowerdQuery, "update") || strings.Contains(lowerdQuery, "delete")
+}
+
 func (s *Server) QueryHandler(w http.ResponseWriter, r *http.Request) {
 	queryResult := new(types.QueryResult)
 
@@ -47,7 +51,6 @@ func (s *Server) QueryHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(query.SqlQuery)
 
 	rows, err := s.Db.Query(query.SqlQuery)
 	if err != nil {
@@ -98,6 +101,13 @@ func (s *Server) QueryHandler(w http.ResponseWriter, r *http.Request) {
 		queryResult.Result = nil
 		_ = json.NewEncoder(w).Encode(queryResult)
 		return
+	}
+
+	if ShouldAddQueryToLogs(query) {
+		s.Logs = append(s.Logs, query.SqlQuery)
+		for _, log := range s.Logs {
+			fmt.Println(log)
+		}
 	}
 
 	queryResult.Result = results

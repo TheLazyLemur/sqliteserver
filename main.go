@@ -16,8 +16,8 @@ func main() {
 	}
 
 	s := &server.Server{
-		Port:      ":" + port,
-		Followers: make(map[string]struct{}),
+		Port: ":" + port,
+		Logs: make([]string, 0),
 	}
 
 	dbAddr := ""
