@@ -14,9 +14,10 @@ import (
 )
 
 type Server struct {
-	Db   *sql.DB
-	Port string
-	Logs []string
+	Db    *sql.DB
+	LogDb *sql.DB
+	Port  string
+	Logs  []string
 }
 
 func (s *Server) Run() {
@@ -25,7 +26,7 @@ func (s *Server) Run() {
 	router.Post("/query", s.QueryHandler)
 	router.Post("/health", s.HealthHandler)
 
-	log.Printf("Listening on port %s", s.Port)
+	log.Printf("Listening on port %s\n", s.Port)
 	log.Fatal(http.ListenAndServe(s.Port, router))
 }
 
@@ -51,8 +52,9 @@ func (s *Server) QueryHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
+	fmt.Println(len(query.Params))
 
-	rows, err := s.Db.Query(query.SqlQuery)
+	rows, err := s.Db.Query(query.SqlQuery, query.Params...)
 	if err != nil {
 		queryResult.Error = err.Error()
 		queryResult.Result = nil
@@ -104,6 +106,14 @@ func (s *Server) QueryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if ShouldAddQueryToLogs(query) {
+		_, err := s.LogDb.Exec("INSERT INTO log (query) VALUES (?)", query.SqlQuery)
+		if err != nil {
+			queryResult.Error = err.Error()
+			queryResult.Result = nil
+			_ = json.NewEncoder(w).Encode(queryResult)
+			return
+		}
+
 		s.Logs = append(s.Logs, query.SqlQuery)
 		for _, log := range s.Logs {
 			fmt.Println(log)

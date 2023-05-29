@@ -2,6 +2,7 @@ package types
 
 type Query struct {
 	SqlQuery string `json:"sqlQuery"`
+	Params   []any  `json:"params"`
 }
 
 type QueryResult struct {
